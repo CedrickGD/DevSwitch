@@ -3,3 +3,9 @@
 -keepclassmembers class * extends androidx.datastore.preferences.protobuf.GeneratedMessageLite {
     <fields>;
 }
+
+# Shizuku: we call Shizuku.newProcess(...) reflectively, and the AIDL/binder
+# classes are referenced by the platform — keep them intact.
+-keep class rikka.shizuku.** { *; }
+-keep class moe.shizuku.** { *; }
+-keep interface rikka.shizuku.** { *; }

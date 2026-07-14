@@ -226,6 +226,8 @@ fun AppSettingsScreen(onBack: () -> Unit) {
 
             SectionLabel("Updates")
             UpdateSection(updates)
+            Spacer(Modifier.height(12.dp))
+            ShizukuSection()
             Spacer(Modifier.height(24.dp))
 
             SectionLabel("About")

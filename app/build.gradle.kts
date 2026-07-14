@@ -19,8 +19,8 @@ android {
         applicationId = "com.cedrickgd.devswitch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 7
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -75,4 +75,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.datastore:datastore-preferences:1.1.6")
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }
