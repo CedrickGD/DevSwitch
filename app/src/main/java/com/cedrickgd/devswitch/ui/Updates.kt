@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +23,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,11 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.cedrickgd.devswitch.data.ShizukuInstaller
 import com.cedrickgd.devswitch.data.UpdateInfo
 import com.cedrickgd.devswitch.data.UpdateManager
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 sealed interface UpdateState {
@@ -85,11 +80,7 @@ class UpdateController(
                 val file = UpdateManager.downloadApk(context, info) { progress ->
                     state = UpdateState.Downloading(info, progress)
                 }
-                // Prefer a fully silent Shizuku install; fall back to the
-                // system installer (which prompts on some OEMs) otherwise.
-                val installed = ShizukuInstaller.hasPermission() &&
-                    ShizukuInstaller.install(context, file).isSuccess
-                if (!installed) UpdateManager.installApk(context, file)
+                UpdateManager.installApk(context, file)
             }
                 .onSuccess { state = UpdateState.Available(info) }
                 .onFailure { state = UpdateState.Failed("Download failed") }
@@ -165,105 +156,6 @@ fun UpdateBanner(controller: UpdateController) {
             if (state is UpdateState.Available) {
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = controller::downloadAndInstall) { Text("Update") }
-            }
-        }
-    }
-}
-
-/** Shizuku status + setup for fully silent installs. */
-@Composable
-fun ShizukuSection() {
-    val context = LocalContext.current
-    var status by remember { mutableStateOf(ShizukuInstaller.status(context)) }
-
-    // Re-check periodically so the card reflects Shizuku being started/authorized.
-    LaunchedEffect(Unit) {
-        while (true) {
-            status = ShizukuInstaller.status(context)
-            delay(1500)
-        }
-    }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (status == ShizukuInstaller.Status.READY) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            }
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.Bolt,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        tint = if (status == ShizukuInstaller.Status.READY) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Silent updates (Shizuku)", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        when (status) {
-                            ShizukuInstaller.Status.READY ->
-                                "Connected — updates install with no prompts"
-                            ShizukuInstaller.Status.NEEDS_PERMISSION ->
-                                "Running — grant DevSwitch access to enable"
-                            ShizukuInstaller.Status.NOT_RUNNING ->
-                                "Installed but not started — open Shizuku and start the service"
-                            ShizukuInstaller.Status.NOT_INSTALLED ->
-                                "Optional. Install Shizuku for one-tap silent updates on Samsung."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            when (status) {
-                ShizukuInstaller.Status.NEEDS_PERMISSION -> Button(
-                    onClick = {
-                        ShizukuInstaller.requestPermission { granted ->
-                            if (granted) status = ShizukuInstaller.Status.READY
-                        }
-                    },
-                ) { Text("Grant access") }
-                ShizukuInstaller.Status.NOT_RUNNING -> FilledTonalButton(
-                    onClick = {
-                        runCatching {
-                            context.packageManager
-                                .getLaunchIntentForPackage(ShizukuInstaller.SHIZUKU_PACKAGE)
-                                ?.let { context.startActivity(it) }
-                        }
-                    },
-                ) { Text("Open Shizuku") }
-                ShizukuInstaller.Status.NOT_INSTALLED -> FilledTonalButton(
-                    onClick = {
-                        val intent = android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse(
-                                "https://github.com/RikkaApps/Shizuku/releases/latest",
-                            ),
-                        )
-                        runCatching { context.startActivity(intent) }
-                    },
-                ) { Text("Get Shizuku") }
-                ShizukuInstaller.Status.READY -> Unit
             }
         }
     }
