@@ -80,6 +80,7 @@ import com.cedrickgd.devswitch.data.DevSettingsController
 import com.cedrickgd.devswitch.data.Prefs
 import com.cedrickgd.devswitch.data.SettingsRegistry
 import com.cedrickgd.devswitch.service.MonitorService
+import com.cedrickgd.devswitch.service.StateNotifier
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -95,6 +96,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val watched by prefs.watched.collectAsState(initial = emptySet())
+    val persistentStateNotifs by prefs.persistentStateNotifications.collectAsState(initial = true)
 
     val supported = remember { SettingsRegistry.all.filter(controller::isSupported) }
 
@@ -107,6 +109,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
         hasAccess = controller.hasSecureSettingsAccess()
         values = supported.associate { it.key to controller.isOn(it) }
         animScale = controller.animationScale()
+        StateNotifier.sync(context, controller)
     }
 
     DisposableEffect(Unit) {
@@ -127,6 +130,9 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
 
     fun toggle(setting: DevSetting, on: Boolean) {
         val result = controller.setEnabled(setting, on)
+        result.onSuccess {
+            StateNotifier.onAppToggle(context, setting, on, persistentStateNotifs)
+        }
         refresh()
         result.onFailure { error ->
             scope.launch {

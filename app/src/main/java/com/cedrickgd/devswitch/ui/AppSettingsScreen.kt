@@ -35,6 +35,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -69,6 +70,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
     val accent by prefs.accent.collectAsState(initial = Prefs.DEFAULT_ACCENT)
     val watched by prefs.watched.collectAsState(initial = emptySet())
+    val persistentStateNotifs by prefs.persistentStateNotifications.collectAsState(initial = true)
 
     val version = remember {
         runCatching {
@@ -162,12 +164,34 @@ fun AppSettingsScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(24.dp))
 
-            SectionLabel("Monitoring")
+            SectionLabel("Notifications")
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
             ) {
                 Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Persistent while enabled",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                "Keep an ongoing notification while a setting you turned on " +
+                                    "stays on. Off = dismissible notification instead.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Switch(
+                            checked = persistentStateNotifs,
+                            onCheckedChange = { on ->
+                                scope.launch { prefs.setPersistentStateNotifications(on) }
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
                     Text(
                         if (watched.isEmpty()) {
                             "No settings watched"

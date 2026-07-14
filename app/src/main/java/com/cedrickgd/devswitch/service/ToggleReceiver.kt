@@ -3,17 +3,18 @@ package com.cedrickgd.devswitch.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import com.cedrickgd.devswitch.data.DevSettingsController
+import com.cedrickgd.devswitch.data.Prefs
 import com.cedrickgd.devswitch.data.SettingsRegistry
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
-/** Handles "Turn back on" actions from alert notifications. */
+/** Handles "Turn back on" / "Turn off" actions from notifications. */
 class ToggleReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.i("DevSwitch", "ToggleReceiver: ${intent.extras?.keySet()?.joinToString()}")
         val key = intent.getStringExtra(EXTRA_KEY) ?: return
         val on = intent.getBooleanExtra(EXTRA_ON, true)
         val setting = SettingsRegistry.byKey(key) ?: return
@@ -21,7 +22,12 @@ class ToggleReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(context).cancel(key.hashCode())
         if (result.isFailure) {
             Toast.makeText(context, "Couldn't change ${setting.title}", Toast.LENGTH_SHORT).show()
+            return
         }
+        val persistent = runBlocking {
+            Prefs(context.applicationContext).persistentStateNotifications.first()
+        }
+        StateNotifier.onAppToggle(context, setting, on, persistent)
     }
 
     companion object {

@@ -101,6 +101,7 @@ class MonitorService : Service() {
         if (previous == on) return
         lastKnown[setting.key] = on
         updateStatusNotification()
+        if (!on) StateNotifier.sync(this, controller)
         if (SelfChangeTracker.wasRecentSelfChange(setting.key)) return
         sendAlert(setting, on)
     }

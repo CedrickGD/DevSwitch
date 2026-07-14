@@ -20,6 +20,7 @@ class Prefs(private val context: Context) {
         private val KEY_THEME = stringPreferencesKey("theme_mode")
         private val KEY_ACCENT = stringPreferencesKey("accent")
         private val KEY_WATCHED = stringSetPreferencesKey("watched")
+        private val KEY_PERSISTENT_STATE = booleanPreferencesKey("persistent_state_notifications")
 
         const val DEFAULT_ACCENT = "indigo"
     }
@@ -38,6 +39,10 @@ class Prefs(private val context: Context) {
     val watched: Flow<Set<String>> =
         context.dataStore.data.map { it[KEY_WATCHED] ?: emptySet() }
 
+    /** Whether "X is ON" notifications for app-made toggles are ongoing (non-dismissible). */
+    val persistentStateNotifications: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PERSISTENT_STATE] ?: true }
+
     suspend fun setOnboarded() {
         context.dataStore.edit { it[KEY_ONBOARDED] = true }
     }
@@ -48,6 +53,10 @@ class Prefs(private val context: Context) {
 
     suspend fun setAccent(id: String) {
         context.dataStore.edit { it[KEY_ACCENT] = id }
+    }
+
+    suspend fun setPersistentStateNotifications(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_PERSISTENT_STATE] = enabled }
     }
 
     /** Toggles a watched setting and returns the resulting set. */
