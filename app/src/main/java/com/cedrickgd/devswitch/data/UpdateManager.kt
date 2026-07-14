@@ -1,9 +1,11 @@
 package com.cedrickgd.devswitch.data
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import androidx.core.content.FileProvider
+import android.content.pm.PackageInstaller
+import android.os.Build
+import com.cedrickgd.devswitch.service.InstallReceiver
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -75,6 +77,7 @@ object UpdateManager {
     ): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val file = File(dir, "devswitch-${info.versionName}.apk")
+        dir.listFiles()?.forEach { if (it != file) it.delete() } // drop stale downloads
         val connection = (URL(info.apkUrl).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = true
             connectTimeout = 15_000
@@ -101,14 +104,43 @@ object UpdateManager {
         }
     }
 
+    /**
+     * Installs the APK as a silent self-update via [PackageInstaller].
+     * On Android 12+ an app that holds REQUEST_INSTALL_PACKAGES may update
+     * itself with no confirmation dialog (USER_ACTION_NOT_REQUIRED); on
+     * Android 14+ we also claim update-ownership so later updates stay silent.
+     * If the system still insists on a prompt, [InstallReceiver] launches it.
+     */
     fun installApk(context: Context, file: File) {
-        val uri: Uri = FileProvider.getUriForFile(
-            context, "${context.packageName}.fileprovider", file,
-        )
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(
+            PackageInstaller.SessionParams.MODE_FULL_INSTALL,
+        ).apply {
+            setAppPackageName(context.packageName)
+            if (Build.VERSION.SDK_INT >= 31) {
+                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+            if (Build.VERSION.SDK_INT >= 34) {
+                runCatching { setRequestUpdateOwnership(true) }
+            }
+        }
+        val sessionId = installer.createSession(params)
+        installer.openSession(sessionId).use { session ->
+            file.inputStream().use { input ->
+                session.openWrite("devswitch.apk", 0, file.length()).use { output ->
+                    input.copyTo(output)
+                    session.fsync(output)
+                }
+            }
+            val statusIntent = Intent(context, InstallReceiver::class.java)
+                .setAction(InstallReceiver.ACTION_INSTALL_STATUS)
+            val pending = PendingIntent.getBroadcast(
+                context,
+                sessionId,
+                statusIntent,
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            session.commit(pending.intentSender)
+        }
     }
 }
