@@ -3,6 +3,7 @@ package com.cedrickgd.devswitch
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.cedrickgd.devswitch.service.UpdateCheckWorker
 
 class DevSwitchApp : Application() {
 
@@ -38,11 +39,23 @@ class DevSwitchApp : Application() {
                 setShowBadge(false)
             }
         )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_UPDATES,
+                "App updates",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "Notifies you when a new DevSwitch version is available"
+            }
+        )
+
+        UpdateCheckWorker.schedule(this)
     }
 
     companion object {
         const val CHANNEL_MONITOR = "monitor"
         const val CHANNEL_ALERTS = "alerts"
         const val CHANNEL_STATE = "state"
+        const val CHANNEL_UPDATES = "updates"
     }
 }

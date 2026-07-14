@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DevSwitch</string>
+    <string name="auto_install_description">Lets DevSwitch confirm the system update dialog for you, so app updates install without any taps. Only acts while DevSwitch is installing an update it downloaded.</string>
 </resources>

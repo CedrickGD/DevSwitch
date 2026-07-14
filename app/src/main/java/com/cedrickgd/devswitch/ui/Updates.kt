@@ -12,10 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.ComponentName
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,7 +41,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.cedrickgd.devswitch.data.UpdateInfo
 import com.cedrickgd.devswitch.data.UpdateManager
+import com.cedrickgd.devswitch.service.AutoInstallService
+import com.cedrickgd.devswitch.service.UpdateNotifier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 sealed interface UpdateState {
@@ -65,6 +74,7 @@ class UpdateController(
                         silent -> UpdateState.Idle
                         else -> UpdateState.UpToDate
                     }
+                    if (info != null && silent) UpdateNotifier.notifyAvailable(context, info)
                 }
                 .onFailure {
                     state = if (silent) UpdateState.Idle else UpdateState.Failed("Couldn't reach GitHub")
@@ -156,6 +166,108 @@ fun UpdateBanner(controller: UpdateController) {
             if (state is UpdateState.Available) {
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = controller::downloadAndInstall) { Text("Update") }
+            }
+        }
+    }
+}
+
+private fun isAutoInstallEnabled(context: Context): Boolean {
+    val expected = ComponentName(context, AutoInstallService::class.java).flattenToString()
+    val enabled = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+    ) ?: return false
+    return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+}
+
+/** Opt-in "seamless mode": auto-confirm the system update dialog via Accessibility. */
+@Composable
+fun SeamlessUpdatesSection() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(isAutoInstallEnabled(context)) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            enabled = isAutoInstallEnabled(context)
+            delay(1500)
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (enabled) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            }
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = if (enabled) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Seamless updates", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (enabled) {
+                            "On — updates install with no taps at all"
+                        } else {
+                            "Off — one confirm tap per update. Turn on to skip it."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Uses an accessibility helper to tap the system \"Update this app?\" dialog " +
+                    "for you. It only acts while DevSwitch is installing an update it " +
+                    "downloaded. On Android 13+ you may first need App info → ⋮ → " +
+                    "Allow restricted settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            if (enabled) {
+                FilledTonalButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+                            )
+                        }
+                    },
+                ) { Text("Manage") }
+            } else {
+                Button(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+                            )
+                        }
+                    },
+                ) { Text("Turn on") }
             }
         }
     }

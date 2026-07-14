@@ -124,6 +124,9 @@ object UpdateManager {
                 runCatching { setRequestUpdateOwnership(true) }
             }
         }
+        // Arm the accessibility auto-tapper (if the user enabled seamless mode)
+        // so the system confirm dialog is dismissed without a manual tap.
+        AutoInstall.arm()
         val sessionId = installer.createSession(params)
         installer.openSession(sessionId).use { session ->
             file.inputStream().use { input ->

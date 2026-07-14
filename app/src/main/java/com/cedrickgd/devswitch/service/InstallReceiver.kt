@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.widget.Toast
+import com.cedrickgd.devswitch.MainActivity
+import com.cedrickgd.devswitch.data.AutoInstall
 
 /**
  * Receives PackageInstaller session results for in-app self-updates.
@@ -28,8 +30,19 @@ class InstallReceiver : BroadcastReceiver() {
                     runCatching { context.startActivity(it) }
                 }
             }
-            PackageInstaller.STATUS_SUCCESS -> Unit // app process is replaced
+            PackageInstaller.STATUS_SUCCESS -> {
+                AutoInstall.disarm()
+                // Relaunch so the app comes back on its own after updating.
+                runCatching {
+                    context.startActivity(
+                        Intent(context, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    )
+                }
+            }
             else -> {
+                AutoInstall.disarm()
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 Toast.makeText(
                     context,
