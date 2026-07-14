@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,12 +40,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.cedrickgd.devswitch.data.DevSettingsController
+import com.cedrickgd.devswitch.data.Prefs
 import com.cedrickgd.devswitch.data.UpdateInfo
 import com.cedrickgd.devswitch.data.UpdateManager
 import com.cedrickgd.devswitch.service.AutoInstallService
 import com.cedrickgd.devswitch.service.UpdateNotifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 sealed interface UpdateState {
@@ -89,6 +93,10 @@ class UpdateController(
             runCatching {
                 val file = UpdateManager.downloadApk(context, info) { progress ->
                     state = UpdateState.Downloading(info, progress)
+                }
+                // Re-assert the user's "skip Play Protect" choice in case GMS reset it.
+                if (Prefs(context).skipPlayProtect.first()) {
+                    DevSettingsController(context).setPlayProtectScan(false)
                 }
                 UpdateManager.installApk(context, file)
             }
@@ -167,6 +175,65 @@ fun UpdateBanner(controller: UpdateController) {
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = controller::downloadAndInstall) { Text("Update") }
             }
+        }
+    }
+}
+
+/** Toggle to disable the Play Protect "scan this app?" prompt during installs. */
+@Composable
+fun PlayProtectCard() {
+    val context = LocalContext.current
+    val controller = remember { DevSettingsController(context) }
+    val prefs = remember { Prefs(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    val hasAccess = remember { controller.hasSecureSettingsAccess() }
+    var scanEnabled by remember { mutableStateOf(controller.isPlayProtectScanEnabled()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            scanEnabled = controller.isPlayProtectScanEnabled()
+            delay(1500)
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Skip Play Protect scan", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        when {
+                            !hasAccess -> "Needs the one-time ADB access grant first"
+                            !scanEnabled -> "Off — no Play Protect prompt on install"
+                            else -> "On — Play Protect scans each install (default)"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Switch(
+                    checked = !scanEnabled,
+                    enabled = hasAccess,
+                    onCheckedChange = { skip ->
+                        controller.setPlayProtectScan(!skip)
+                        scanEnabled = controller.isPlayProtectScanEnabled()
+                        scope.launch { prefs.setSkipPlayProtect(skip) }
+                    },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Turns off Play Protect's app verification so updates install without the " +
+                    "\"scan this app?\" popup. This lowers a Google security check — only for " +
+                    "installs you trust (like DevSwitch's own updates).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

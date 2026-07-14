@@ -3,9 +3,12 @@ package com.cedrickgd.devswitch.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.cedrickgd.devswitch.data.DevSettingsController
+import com.cedrickgd.devswitch.data.Prefs
 import com.cedrickgd.devswitch.data.UpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Handles the "Update" action from the new-version notification. */
@@ -21,6 +24,9 @@ class UpdateActionReceiver : BroadcastReceiver() {
                 UpdateNotifier.notifyProgress(app, info.versionName, 0)
                 val file = UpdateManager.downloadApk(app, info) { progress ->
                     UpdateNotifier.notifyProgress(app, info.versionName, (progress * 100).toInt())
+                }
+                if (Prefs(app).skipPlayProtect.first()) {
+                    DevSettingsController(app).setPlayProtectScan(false)
                 }
                 UpdateNotifier.cancel(app)
                 UpdateManager.installApk(app, file)

@@ -228,6 +228,8 @@ fun AppSettingsScreen(onBack: () -> Unit) {
             UpdateSection(updates)
             Spacer(Modifier.height(12.dp))
             SeamlessUpdatesSection()
+            Spacer(Modifier.height(12.dp))
+            PlayProtectCard()
             Spacer(Modifier.height(24.dp))
 
             SectionLabel("About")

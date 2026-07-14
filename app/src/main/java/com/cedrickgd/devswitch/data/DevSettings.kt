@@ -168,4 +168,41 @@ class DevSettingsController(private val context: Context) {
             }
         }
     }
+
+    // --- Play Protect install verification ---------------------------------
+    // These globals gate the "Play Protect doesn't recognize this app — scan?"
+    // dialog that GMS shows on every sideloaded install. Writable with
+    // WRITE_SECURE_SETTINGS; disabling them stops the prompt during updates.
+
+    fun isPlayProtectScanEnabled(): Boolean {
+        val enable = readGlobalInt("package_verifier_enable", 1)
+        val consent = readGlobalInt("package_verifier_user_consent", 1)
+        return enable != 0 && consent != -1
+    }
+
+    fun setPlayProtectScan(enabled: Boolean): Result<Unit> = runCatching {
+        if (enabled) {
+            putGlobal("package_verifier_enable", "1")
+            putGlobal("package_verifier_user_consent", "1")
+            putGlobal("upload_apk_enable", "1")
+        } else {
+            putGlobal("package_verifier_enable", "0")
+            putGlobal("package_verifier_user_consent", "-1")
+            putGlobal("verifier_verify_adb_installs", "0")
+            putGlobal("upload_apk_enable", "0")
+        }
+    }
+
+    private fun readGlobalInt(key: String, default: Int): Int = try {
+        Settings.Global.getInt(resolver, key, default)
+    } catch (_: Exception) {
+        default
+    }
+
+    private fun putGlobal(key: String, value: String) {
+        SelfChangeTracker.recordWrite(key)
+        // Best-effort: some keys may be absent/rejected on a given OEM build;
+        // don't let one failure abort the rest.
+        runCatching { Settings.Global.putString(resolver, key, value) }
+    }
 }

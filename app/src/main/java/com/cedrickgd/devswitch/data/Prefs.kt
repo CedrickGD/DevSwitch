@@ -21,6 +21,7 @@ class Prefs(private val context: Context) {
         private val KEY_ACCENT = stringPreferencesKey("accent")
         private val KEY_WATCHED = stringSetPreferencesKey("watched")
         private val KEY_PERSISTENT_STATE = booleanPreferencesKey("persistent_state_notifications")
+        private val KEY_SKIP_PLAY_PROTECT = booleanPreferencesKey("skip_play_protect")
 
         const val DEFAULT_ACCENT = "indigo"
     }
@@ -43,6 +44,10 @@ class Prefs(private val context: Context) {
     val persistentStateNotifications: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PERSISTENT_STATE] ?: true }
 
+    /** Whether to keep Play Protect install scanning disabled (re-applied before each update). */
+    val skipPlayProtect: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_SKIP_PLAY_PROTECT] ?: false }
+
     suspend fun setOnboarded() {
         context.dataStore.edit { it[KEY_ONBOARDED] = true }
     }
@@ -57,6 +62,10 @@ class Prefs(private val context: Context) {
 
     suspend fun setPersistentStateNotifications(enabled: Boolean) {
         context.dataStore.edit { it[KEY_PERSISTENT_STATE] = enabled }
+    }
+
+    suspend fun setSkipPlayProtect(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_SKIP_PLAY_PROTECT] = enabled }
     }
 
     /** Toggles a watched setting and returns the resulting set. */
